@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Playnix | Play Free Online Games</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+:root{
+  --bg:#0b0b0b;
+  --panel:#141414;
+  --card:#1c1c1c;
+  --border:#2a2a2a;
+  --text:#eaeaea;
+  --accent:#ff8c00;
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Segoe UI,Arial}
+body{background:var(--bg);color:var(--text);overflow:hidden}
+::-webkit-scrollbar{width:10px}
+::-webkit-scrollbar-thumb{background:var(--accent)}
+::-webkit-scrollbar-track{background:#090909}
+header{
+  background:var(--panel);
+  border-bottom:1px solid var(--border);
+  padding:14px 20px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+header img{height:36px;}
+header input{
+  background:#0f0f0f;
+  border:1px solid var(--border);
+  color:#fff;
+  padding:8px 12px;
+  width:240px;
+  outline:none;
+}
+main{
+  height:calc(100vh - 140px);
+  overflow-y:auto;
+  padding:20px;
+}
+.games{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+  gap:18px;
+}
+.game{
+  background:var(--card);
+  border:1px solid var(--border);
+  cursor:pointer;
+  position:relative;
+}
+.game:hover{border-color:var(--accent);}
+.game img{width:100%;height:140px;object-fit:cover;}
+.game-title{padding:10px;font-size:14px;text-align:center;}
+.fav{position:absolute;top:8px;right:8px;font-size:18px;color:#666;}
+.fav.active{color:var(--accent)}
+.pagination{
+  height:60px;
+  background:#101010;
+  border-top:1px solid var(--border);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:6px;
+}
+.pagination button{
+  background:#1a1a1a;
+  border:1px solid var(--border);
+  color:#fff;
+  padding:6px 12px;
+  cursor:pointer;
+}
+.pagination button.active{background:var(--accent);color:#000;}
+.popup{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.88);
+  display:none;
+  justify-content:center;
+  align-items:center;
+  z-index:999;
+}
+.popup-box{
+  width:92%;
+  max-width:1000px;
+  height:88%;
+  background:#000;
+  border:2px solid var(--accent);
+  display:flex;
+  flex-direction:column;
+}
+.popup-header{
+  background:#111;
+  padding:8px 12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.popup-header button{
+  background:none;
+  border:none;
+  color:var(--accent);
+  font-size:18px;
+  cursor:pointer;
+}
+.popup-info{
+  padding:10px;
+  background:#141414;
+  font-size:13px;
+  border-bottom:1px solid var(--border);
+}
+.popup iframe{flex:1;border:none;}
+</style>
+</head>
+<body>
+<header>
+  <img src="./assets/Playnix.png" alt="Playnix Logo">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <input id="search" placeholder="Search games...">
+    <i class="fa-solid fa-star" id="favBtn" style="color:#666;font-size:20px;cursor:pointer;"></i>
+  </div>
+</header>
+<main>
+  <div class="games" id="games"></div>
+</main>
+<div class="pagination" id="pagination"></div>
+<div class="popup" id="popup" style="z-index:1000;">
+  <div class="popup-box" id="popupBox">
+    <div class="popup-header">
+      <span id="popupTitle"></span>
+      <div>
+        <button onclick="fullscreenGame()"><i class="fa-solid fa-expand"></i></button>
+        <button onclick="closeGame()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    </div>
+    <div class="popup-info" id="popupInfo"></div>
+    <iframe id="gameFrame"></iframe>
+  </div>
+</div>
+<div class="popup" id="favPopup" style="z-index:900;">
+  <div class="popup-box" style="max-width:800px;height:80%;">
+    <div class="popup-header">
+      <span>Favorites</span>
+      <div>
+        <button onclick="closeFav()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    </div>
+    <div class="popup-info" style="border-bottom:none;padding:10px;color:#fff;">
+      <input id="favSearch" placeholder="Search favorites..." style="width:100%;padding:6px 10px;margin-bottom:10px;background:#0f0f0f;border:1px solid #2a2a2a;color:#fff;outline:none;">
+      <div class="games" id="favGames"></div>
+    </div>
+  </div>
+</div>
+<script>
+let games = [];
+let favs = JSON.parse(localStorage.getItem("playnixFavs")||"[]");
+let page = 1;
+const MAX_PAGES = 11;
+const gamesBox = document.getElementById("games");
+const favGamesBox = document.getElementById("favGames");
+const pagination = document.getElementById("pagination");
+function load(pageNum){
+  page = pageNum;
+  fetch(`https://gamemonetize.com/feed.php?format=0&page=${page}`)
+    .then(r=>r.json())
+    .then(data=>{
+      games = data;
+      renderGames(data);
+      renderPages();
+      window.scrollTo({top:0});
+    });
+}
+function renderGames(list){
+  gamesBox.innerHTML="";
+  list.forEach(g=>{
+    const card=document.createElement("div");
+    card.className="game";
+    card.innerHTML=`<i class="fa-solid fa-star fav ${favs.includes(g.id)?"active":""}"></i><img src="${g.thumb}"><div class="game-title">${g.title}</div>`;
+    card.querySelector(".fav").onclick=(e)=>{e.stopPropagation();toggleFav(g.id,e.target);};
+    card.onclick=()=>openGame(g);
+    gamesBox.appendChild(card);
+  });
+}
+function renderFavGames(list){
+  favGamesBox.innerHTML="";
+  const favList = list || games.filter(g => favs.includes(g.id));
+  favList.forEach(g=>{
+    const card=document.createElement("div");
+    card.className="game";
+    card.innerHTML=`<i class="fa-solid fa-star fav active"></i><img src="${g.thumb}"><div class="game-title">${g.title}</div>`;
+    card.querySelector(".fav").onclick=(e)=>{e.stopPropagation();toggleFav(g.id,e.target);};
+    card.onclick=()=>openGame(g);
+    favGamesBox.appendChild(card);
+  });
+}
+function renderPages(){
+  pagination.innerHTML="";
+  for(let i=1;i<=MAX_PAGES;i++){
+    const b=document.createElement("button");
+    b.textContent=i;
+    if(i===page) b.classList.add("active");
+    b.onclick=()=>load(i);
+    pagination.appendChild(b);
+  }
+}
+function toggleFav(id,el){
+  if(favs.includes(id)){favs=favs.filter(f=>f!==id);el.classList.remove("active");}else{favs.push(id);el.classList.add("active");}
+  localStorage.setItem("playnixFavs",JSON.stringify(favs));
+  renderGames(games);
+  renderFavGames();
+}
+document.getElementById("search").oninput=(e)=>{
+  const q=e.target.value.toLowerCase();
+  renderGames(games.filter(g=>g.title.toLowerCase().includes(q)||(g.description||"").toLowerCase().includes(q)));
+};
+document.getElementById("favSearch").oninput=(e)=>{
+  const q=e.target.value.toLowerCase();
+  renderFavGames(games.filter(g=>favs.includes(g.id)&&(g.title.toLowerCase().includes(q)||(g.description||"").toLowerCase().includes(q))));
+};
+document.getElementById("favBtn").onclick=()=>{
+  renderFavGames();
+  document.getElementById("favPopup").style.display="flex";
+};
+function closeFav(){document.getElementById("favPopup").style.display="none";}
+function openGame(g){
+  document.getElementById("popupTitle").textContent=g.title;
+  document.getElementById("popupInfo").innerHTML=`<b>Category:</b> ${g.category}<br><b>Description:</b> ${g.description}<br><b>Resolution:</b> ${g.width}x${g.height}`;
+  document.getElementById("gameFrame").src=g.url;
+  document.getElementById("popup").style.display="flex";
+}
+function closeGame(){
+  document.getElementById("popup").style.display="none";
+  document.getElementById("gameFrame").src="";
+  if(document.fullscreenElement) document.exitFullscreen();
+}
+function fullscreenGame(){
+  const box=document.getElementById("popupBox");
+  if(!document.fullscreenElement) box.requestFullscreen();
+  else document.exitFullscreen();
+}
+document.addEventListener("keydown",e=>{if(e.key==="Escape" && document.fullscreenElement){document.exitFullscreen();}});
+load(1);
+</script>
+</body>
+</html>
